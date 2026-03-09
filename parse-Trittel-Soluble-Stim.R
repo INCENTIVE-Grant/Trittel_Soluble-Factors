@@ -32,12 +32,12 @@ source('Controlled-Vocab.R')
 
 ## GLOBAL variables
 ProgramName <- 'parse-Trittel-Soluble-Stim.R'
-Version <- 'v2.0'
+Version <- 'v2.0.1'
 
 options(warn=1, width=132)
 
 ## Enable some DEBUGGING statements if TRUE
-DEBUG <- TRUE
+DEBUG <- FALSE
 
 ## Annotate that DEBUGGING is turned on
 if(DEBUG == TRUE) {

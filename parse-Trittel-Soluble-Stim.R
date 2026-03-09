@@ -8,14 +8,11 @@
 ## to output. However, the data appear very well organized and my eye
 ## has not detected inconsistancies in the naming, etc., yet.
 ##
-## Note: at this time, the bridging samples are of limited utility for
-## correction because though they carefully document the plate on
-## which they were analyzed, the plate on which samples were run is
-## not documented. I shall attempt to get Stephie to correct this
-## oversight.
 ##
 ## VERSION HISTORY
 ## [2025-06-15 MeD] Initial version.
+## [2026-03-03 MeD] Updated dataset: Guzmán-Riese-Tritel_Soluble-Factors_2026-03-03.xlsx
+##                  Looks more consistent than before. Bridging samples removed.
 ##
 ##********************************************************************************
 library(AnalysisHeader)
@@ -35,7 +32,7 @@ source('Controlled-Vocab.R')
 
 ## GLOBAL variables
 ProgramName <- 'parse-Trittel-Soluble-Stim.R'
-Version <- 'v1.0'
+Version <- 'v2.0'
 
 options(warn=1, width=132)
 
@@ -48,8 +45,7 @@ if(DEBUG == TRUE) {
 }
 
 ## Expected Excel worksheet names
-ExpectedSheets <- c("Net MFl", "Bridging Samples-Net MFI",
-                    "Concentration", "Bridging Samples-Concentration")
+ExpectedSheets <- c("Net MFl", "Concentration")
 
 ## "Pretty" lines for dividing the output - double-header or single-header
 dhLine <- paste(rep('=', length=(getOption('width')-2)), collapse='')
@@ -108,7 +104,7 @@ stopifnot(Stims$Trial %in% TrialNames,
 
 ## Assign my input file name; if I don't, then get the command-line argument
 if(interactive())
-    inFile <- "Guzmán-Riese-Tritel_Soluble-Factors_2025-06-12.xlsx"
+    inFile <- "Guzmán-Riese-Tritel_Soluble-Factors_2026-03-03.xlsx"
 
 ## Check if an 'inFile' object already exists. Useful in debugging, etc.
 if( !exists('inFile') ) {
@@ -163,7 +159,23 @@ cat("Data input & output files:\n",
 ##********************************************************************************
 ##                                    SUBROUTINES
 ##********************************************************************************
-## Layout of sheet called "Net MFI"
+#' wrapText - utility to output long strings wrapped in a tidy manner
+#'
+#' I frequently output something similar to:
+#'    cat("Header:\n\t", paste(vector, collapse=', '), "\n")
+#' which is frequently too long to read easily as the terminal wraps the text. I
+#' can improve this by wrapping with `strwrap()` which then requires an additional
+#' paste(x, collapse='\n'). This function wraps all that wrapping. (Am I a 'wrap artist'?)
+#'
+#' @param v Character vector to be concatonated with COMMA and wrapped for output.
+#' @param prefix Character to lead each wrapped line with. Default = '\t'
+#' @return Long, wrapped character vector of length 1.
+wrapText <- function(v, prefix='\t') {
+    return(paste(strwrap(paste(v, collapse=', '), width=70, prefix=prefix, initial=prefix),
+                 collapse='\n'))
+}
+
+## Layout of sheet called "Net MFI" (as well as sheet, "Concentration"
 ##   Row 1 = Analyte measured
 ##   Row 2 = Some header + Unit information
 ##   Row 3 - N = data
@@ -171,16 +183,14 @@ cat("Data input & output files:\n",
 ##   Column 1 = Complex SubjectID + Visit + Stim
 ##   Column 2 = SubjectID or BLANK
 ##   Column 3 = Beginning of measurements
-##' Parse the Sample MFI data into Long Format
+##' Parse the Sheet data into Long Format
 ##'
-##' All of the Sample MFI data are on one worksheet called "Net MFI".
+##' All data on sheet "Net MFI" and "Concentration" are in columns.
 ##' Column 1 contains a complex name built of SubjectID + Visit Number + Stimulator Factor
 ##' Column 2 contains the SubjectID but with many BLANKs (pretty formatting)
 ##' Column 3-N contains the measurements
-parseSampleMFI <- function(File, Sheet) {
-    ## FIXME: The MFI and Concentration parsing is so simlar that I should combine them
-    ## FIXME: Adjust the columns to avoid the "Stimulation" column.
-    cat("\n", dhLine, "\nParsing Sample MFI worksheet.\n", sep='')
+parseSampleSheet <- function(File, Sheet) {
+    cat("\n", dhLine, "\nParsing worksheet: '", Sheet, "'.\n", sep='')
 
     cat("\n\tReading row-1: Analyte names.\n")
     analytes <- unname(unlist(read_xlsx(path=File, sheet=Sheet,
@@ -188,15 +198,15 @@ parseSampleMFI <- function(File, Sheet) {
     cat("\n\tReading row-2: Headings and units.\n")
     unitsRow <- unname(unlist(read_xlsx(path=File, sheet=Sheet,
                                         col_names=FALSE, trim_ws=TRUE, n_max=1, skip=1)))
-    cat("\n\tReading remaining rows: MFI data.\n")
+    cat("\n\tReading remaining rows of data.\n")
     dat      <- as.data.frame(read_xlsx(path=File, sheet=Sheet,
                                         col_names=FALSE, trim_ws=TRUE, skip=2))
-    cat("\n\tParsing SampleNames --> SubjectID, Visit Number, Stim Treatment\n")
+    cat("\nParsing SampleNames(col 1) --> SubjectID, Visit Number, Stim Treatment\n")
     samples <- parseSampleNames(dat[, 1], dat[, 2])
 
     ##------------------------------------------------------------
-    ## Log the experimental design for MFI
-    cat("\n", shLine, "\nEXPERIMENTAL DESIGN for MFI data set:\n\n", sep='')
+    ## Log the experimental design
+    cat("\n", shLine, "\nEXPERIMENTAL DESIGN for dataset: '", Sheet, "'\n\n", sep='')
     cat("For QIV2:\n")
     inx <- samples$Trial == 'QIV2'
     print(table(samples$SubjectID[inx], samples$Stim[inx], samples$Visit[inx]))
@@ -215,19 +225,18 @@ parseSampleMFI <- function(File, Sheet) {
     numAnalytes <- length(analytes)
     stopifnot(numAnalytes == ncol(dat)-2)
     numSamples <- nrow(dat)
-    N <- numAnalytes * numSamples ## Wide --> Long format
+    N <- numAnalytes * numSamples      ## Wide --> Long format
     res <- data.frame(SampleType=rep("Samp", times=N),
                       Trial=rep(samples$Trial, times=numAnalytes),
                       SubjectID=rep(samples$SubjectID, times=numAnalytes),
                       Day=rep(samples$Day, times=numAnalytes),
-                      Assay=rep('SolFact', times=N),
+                      Assay=rep(NA_character_, times=N),
                       Strain=rep(NA_character_, times=N),  # Fill-in later from Stims
                       Protein=rep(NA_character_, times=N),
                       StrainProt=rep(NA_character_, times=N),
                       Dilution=rep(NA_real_, times=N),
                       Value=rep(NA_real_, times=N),
-                      ValueUnit=rep('MFI', times=N),
-                      Stimulation=rep(samples$Stim, times=numAnalytes)
+                      ValueUnit=rep(ifelse(Sheet == 'Concentration', 'pg/ml', 'MFI'), times=N)
                       )
     ## Report on size of the data frame extracted
     if( DEBUG ) {
@@ -253,98 +262,18 @@ parseSampleMFI <- function(File, Sheet) {
 
         ## Lookup the items associated with the stim: Strain, etc
         ind <- match(samples$Stim, Stims$Name)
-        stopifnot( !is.na(ind) )
+        if( any(is.na(ind) == TRUE) ) {
+            cat("ERROR: Unable to match 'samples$Stim' to existing 'Stim$Name'.\n",
+                "These are the errors:\n",
+                paste(samples$Stim[is.na(ind)], collapse=', '), "\n\n",
+                sep='')
+            stop('Can not match the STIM.')
+        }
 
         ## Load the results into the 'res' data frame
+        res$Assay[inx]  <- paste0('SF:', analytes[i])
         res$Strain[inx] <- Stims$Strain[ind]
-        res$Protein[inx] <- analytes[i]
-        res$Dilution[inx] <- 1.0
-        res$Value[inx] <- dat[, i+2]
-    }
-
-    ##------------------------------------------------------------
-    ## Return the results
-    return(res)
-}
-
-##------------------------------------------------------------
-## Parse the Sample "Concentration" worksheet.
-## At first glance, it appears identical to the MFI worksheet.
-## Begin then with copy-and-paste code.
-parseSampleConc <- function(File, Sheet) {
-    cat("\n", dhLine, "\nParsing Sample 'Concentration' worksheet.\n", sep='')
-
-    cat("\n\tReading row-1: Analyte names.\n")
-    analytes <- unname(unlist(read_xlsx(path=File, sheet=Sheet,
-                                        col_names=FALSE, trim_ws=TRUE, n_max=1, skip=0)))
-    cat("\n\tReading row-2: Headings and units.\n")
-    unitsRow <- unname(unlist(read_xlsx(path=File, sheet=Sheet,
-                                        col_names=FALSE, trim_ws=TRUE, n_max=1, skip=1)))
-    cat("\n\tReading remaining rows: Concentration data.\n")
-    dat      <- as.data.frame(read_xlsx(path=File, sheet=Sheet,
-                                        col_names=FALSE, trim_ws=TRUE, skip=2, na=c("", "OOR>")))
-    cat("\n\tParsing SampleNames --> SubjectID, Visit Number, Stim Treatment\n")
-    samples <- parseSampleNames(dat[, 1], dat[, 2])
-
-    ##------------------------------------------------------------
-    ## Log the experimental design for Concentration
-    cat("\n", shLine, "\nEXPERIMENTAL DESIGN for Concentration data set:\n\n", sep='')
-    cat("For QIV2:\n")
-    inx <- samples$Trial == 'QIV2'
-    print(table(samples$SubjectID[inx], samples$Stim[inx], samples$Visit[inx]))
-
-    cat("\nFor QIV3:\n")
-    inx <- samples$Trial == 'QIV3'
-    ## Note in the design, the switching between (WBSA, WBSD) <--> (WBST, WBSW)
-    ## as expected for the different vaccines delivered.
-    print(table(samples$SubjectID[inx], samples$Stim[inx], samples$Visit[inx]))
-
-    ##------------------------------------------------------------
-    ## Build the LONG FORMAT data frame, 'res' for 'result', to return.
-    ## Header for Dobaño data set is:
-    ##    "SampleType","Trial","SubjectID","Day","Assay","Strain","Protein",
-    ##    "StrainProt","Dilution","Value","ValueUnit","Isotype","UreaPresent","PlateID","Well"
-    numAnalytes <- length(analytes)
-    stopifnot(numAnalytes == ncol(dat)-2)
-    numSamples <- nrow(dat)
-    N <- numAnalytes * numSamples ## Wide --> Long format
-    res <- data.frame(SampleType=rep("Samp", times=N),
-                      Trial=rep(samples$Trial, times=numAnalytes),
-                      SubjectID=rep(samples$SubjectID, times=numAnalytes),
-                      Day=rep(samples$Day, times=numAnalytes),
-                      Assay=rep('SolFact', times=N),
-                      Strain=rep(NA_character_, times=N),  # Fill-in later from Stims
-                      Protein=rep(NA_character_, times=N),
-                      StrainProt=rep(NA_character_, times=N),
-                      Dilution=rep(NA_real_, times=N),
-                      Value=rep(NA_real_, times=N),
-                      ValueUnit=rep('pg/ml', times=N),
-                      Stimulation=rep(samples$Stim, times=numAnalytes)
-                      )
-    ## Load in the analytes values into "Assay" as "SolFac: <analyte>"
-    if( DEBUG ) {
-        cat("Data frame 'res' is ", nrow(res), " rows x ", ncol(res), " columns.\n",
-            "\tTotal storage is ", object.size(res), " bytes.\n", sep='')
-        cat("\nAnalyte storage rows in 'res' data frame:\n")
-        cat(sprintf("\t%20s %5s %5s\n", "Analyte", "Low", "High"))
-    }
-    for(i in 1:numAnalytes) {
-        ## Build an index to access a subset for 'res' to store an analyte set of values
-        lo <- ( (i - 1) * numSamples ) + 1
-        hi <- i * numSamples
-        inx <- rep(FALSE, times=N)
-        inx[lo:hi] <- TRUE
-        if( DEBUG )
-            cat(sprintf("\t%20s %5d %5d\n", analytes[i], lo, hi))
-        stopifnot(sum(inx) == nrow(samples))
-
-        ## Lookup the items associated with the stim: Strain, etc
-        ind <- match(samples$Stim, Stims$Name)
-        stopifnot( !is.na(ind) )
-
-        ## Load the results into the 'res' data frame
-        res$Strain[inx] <- Stims$Strain[ind]
-        res$Protein[inx] <- analytes[i]
+        ## res$Protein[inx] <- analytes[i]
         res$Dilution[inx] <- 1.0
         res$Value[inx] <- dat[, i+2]
     }
@@ -369,30 +298,34 @@ parseSampleNames <- function(sampleNames, subjectID) {
     adjustedValue <- rep(FALSE, length(sampleNames))
 
     ## FIX #1:
-    dupName <- 'UIB005-V2-SEB'
-    replName <- 'UIB005-V1-SEB'
-    inx <- sampleNames == dupName
-    if(sum(inx) > 1) {
-        cat("\nSample name '", dupName, "' is duplicated in rows: ",
-            paste(which(inx), collapse=', '), ".\n", sep='')
-        cat("Based on surrounding sample names, the first of the two will be adjusted to '",
-            replName, "'.\n", sep='')
-        sampleNames[ which(inx)[1] ] <- replName
-        adjustedValue[ which(inx)[1] ] <- TRUE
+    if(1 == 1) {
+        dupName <- 'UIB005-V2-SEB'
+        replName <- 'UIB005-V1-SEB'
+        inx <- sampleNames == dupName
+        if(sum(inx) > 1) {
+            cat("\n*** Sample name '", dupName, "' is duplicated in rows: ",
+                paste(which(inx), collapse=', '), ".\n", sep='')
+            cat("\tBased on surrounding sample names, the first of the two will be adjusted to '",
+                replName, "'.\n", sep='')
+            sampleNames[ which(inx)[1] ] <- replName
+            adjustedValue[ which(inx)[1] ] <- TRUE
+        }
     }
 
     ## FIX #2: On "Concentration" worksheet, Subject CHU002 has not initial SubjectID in SampleName
-    subID   <- 'CHU002'
-    badName <- 'V1WBSM1'
-    newName <- 'CHU002-V1-WBSM1'
-    inx <- (subjectID == subID) & (sampleNames == badName)
-    if(sum(inx) > 0) {
-        cat("\nSample name '", badName, "' is not formatted correctly in rows: ",
-            paste(which(inx), collapse=', '), ".\n", sep='')
-        cat("Based on surrounding sample names, it will be adjusted to '",
-            newName, "'.\n", sep='')
-        sampleNames[inx] <- newName
-        adjustedValue[inx] <- TRUE
+    if(1 == 0) {
+        subID   <- 'CHU002'
+        badName <- 'V1WBSM1'
+        newName <- 'CHU002-V1-WBSM1'
+        inx <- (subjectID == subID) & (sampleNames == badName)
+        if(sum(inx) > 0) {
+            cat("\n*** Sample name '", badName, "' is not formatted correctly in rows: ",
+                paste(which(inx), collapse=', '), ".\n", sep='')
+            cat("\tBased on surrounding sample names, it will be adjusted to '",
+                newName, "'.\n", sep='')
+            sampleNames[inx] <- newName
+            adjustedValue[inx] <- TRUE
+        }
     }
 
     ## FIX #3: Several names are simple replacements
@@ -402,9 +335,9 @@ parseSampleNames <- function(sampleNames, subjectID) {
     for(i in 1:nrow(fixData)) {
         inx <- sampleNames == fixData$BadName[i]
         if(sum(inx) == 1) {
-            cat("\nSample name '", fixData$BadName[i], "' appears incorrectly formatted in row: ",
+            cat("\n*** Sample name '", fixData$BadName[i], "' appears incorrectly formatted in row: ",
                 paste(which(inx), collapse=', '), ".\n", sep='')
-            cat("Based on surrounding sample names, the name will be adjusted to: '",
+            cat("\tBased on surrounding sample names, the name will be adjusted to: '",
                 fixData$NewName[i], "'.\n", sep='')
             sampleNames[inx] <- fixData$NewName[i]
             adjustedValue[inx] <- TRUE
@@ -415,9 +348,16 @@ parseSampleNames <- function(sampleNames, subjectID) {
     ## Unfortunately, they are inconsistant:
     ##   1) Sometimes the HYPHEN between Visit and Treatment is dropped.
     ## Tried "strsplit()" without a clean solution. Try RegEx.
-    ## Note: on the 'Concentration' worksheet, a further complication begins where
-    ##       the SubjectID is dropped for days beyond "V1". Instead, the name is
-    ##       shorter and begins with a 'V<number>'.
+    if(1 == 0) {
+        ## NOTE: With the newer release of sheet (2026-03-03), this is
+        ##    no longer true. I will leave the "inxShort" in place,
+        ##    but expect it will not be used.
+        ##
+        ## Note: on the 'Concentration' worksheet, a further
+        ##    complication begins where the SubjectID is dropped for
+        ##    days beyond "V1". Instead, the name is shorter and
+        ##    begins with a 'V<number>'.
+    }
     inxShort <- grepl('^V[0-9]', sampleNames)
     inxLong  <- !inxShort
 
@@ -442,7 +382,6 @@ parseSampleNames <- function(sampleNames, subjectID) {
                                   sampleNames[inxShort], perl=TRUE)
         sampNum[inxShort] <- gsub('^V[0-9]-?[A-Z]{3,4}([0-9]?)$', '\\1',
                                   sampleNames[inxShort], perl=TRUE)
-
     }
 
     ## This leaves many "holes" in the 'id' for the 'Concentration' worksheet.
@@ -450,56 +389,6 @@ parseSampleNames <- function(sampleNames, subjectID) {
     inx <- !is.na(id) & !is.na(subjectID)
     stopifnot( id[inx] == subjectID[inx] )   # Seek to confirm alignment of 'id' and 'subjectID'.
     id <- subjectID
-
-    ## FIX #4: Some errors in Stim and Visit day. Look for duplicates and patterns of stim.
-    subjectIDs <- sort(unique(id))
-    visits <- sort(unique(visit))
-    keys <- c(t(outer(subjectIDs, visits, FUN=paste, sep='-')))
-    stimPattern <- matrix(NA_integer_, nrow=length(keys), ncol=nrow(Stims),
-                          dimnames=list(Key=keys, Stim=Stims$Name))
-    ## Collect the SubjectID x Visit types of patterns.
-    ## We're searching for the "typical" pattern in which the Stims are
-    ## applied - NEG then SEB then ...
-    ## I hope to see a pair (QIV2 and QIV3) of patterns predominate with
-    ## a few oddballs, indicating possible errors, thrown in.
-    for(i in seq_along(subjectIDs)) {
-        for(j in seq_along(visits)) {
-            key <- paste(subjectIDs[i], visits[j], sep='-')
-            inxKey <- (subjectIDs[i] == id) & (visits[j] == visit)
-            stimNames <- stim[inxKey]
-            stimPattern[ (key == rownames(stimPattern)) , ] <- match(colnames(stimPattern), stimNames)
-        }
-    }
-
-    ## Ok - lots of stim patterns collected. What is common and what is uncommon?
-    ## Build a set of unique keys to discern
-    stimPatternKey <- apply(stimPattern, 1, function(x) paste(x, collapse='_'))
-    cat("\nPattern of Stimulus applications computed. Top lines are:\n")
-    print(head(stimPattern, 12))
-    cat("\nA count of the observed patterns is:\n\tkey= ",
-        paste(colnames(stimPattern), collapse='_'), "\n", sep='')
-    tb <- table(stimPatternKey)
-    print(sort(tb))
-
-    ## Select the odd patterns based on arbitrary cut-off of '20'
-    cat("\nOdd patterns are:\n")
-    print(tb[ tb < 20 ] )
-    oddPatterns <- names(tb[tb<20])
-    oddNames <- rownames(stimPattern)[ stimPatternKey %in% oddPatterns ]
-    cat("Odd patterns correspond to the following samples:\n\t",
-        paste(oddNames, collapse=', '), "\n", sep='')
-    cat("\nContext for each of the odd names is shown below:\n")
-    inxOrd <- order(id, visit, stim)
-    for(nm in oddNames) {
-        cat("\n\tName =", nm, "\n")
-        nmSplit <- strsplit(nm, '-')[[1]]
-        inxSub <- (id[inxOrd] == nmSplit[1])
-        tmp <- data.frame(SubjectID=id[inxOrd][inxSub],
-                          Visit=visit[inxOrd][inxSub],
-                          Stim=stim[inxOrd][inxSub]
-                          )
-        print(tmp)
-    }
 
     ## Re-derive "Day" from "Visit"
     day <- ifelse(visit == 'V1', "D000",
@@ -525,7 +414,6 @@ parseSampleNames <- function(sampleNames, subjectID) {
     return(sampNames)
 }
 
-
 ##********************************************************************************
 ##                                    MAIN ROUTINE
 ##********************************************************************************
@@ -534,33 +422,78 @@ sheetNames <- excel_sheets(inFile)
 stopifnot(sheetNames %in% ExpectedSheets)  # Catch major errors
 
 ## Get the "raw data" in MFI - then confirm correct formats
-rawData  <- parseSampleMFI(File=inFile, Sheet="Net MFl")
+rawData  <- parseSampleSheet(File=inFile, Sheet="Net MFl")
 stopifnot(rawData$SampleType %in% SampleTypes,
           rawData$Trial %in% TrialNames,
           rawData$Day %in% VisitDay,
-          rawData$Assay %in% AssayNames,
+          #rawData$Assay %in% AssayNames,
           rawData$Strain %in% KnownStrains,
           colnames(rawData) %in% ColumnNames
           )
 
-
-concData <- parseSampleConc(File=inFile, Sheet="Concentration")
+concData <- parseSampleSheet(File=inFile, Sheet="Concentration")
+stopifnot(concData$SampleType %in% SampleTypes,
+          concData$Trial %in% TrialNames,
+          concData$Day %in% VisitDay,
+          #concData$Assay %in% AssayNames,
+          concData$Strain %in% KnownStrains,
+          colnames(concData) %in% ColumnNames
+          )
 
 ##--------------------------------------------------------------------------------
-## Why are rawData and concData  different sizes?
-if(DEBUG) {
+## Confirm rawData and concData are same size and nothing is duplicated
+cat(dhLine, "\n",
+    "Checking for consistency and no duplication within MFI and Conc, as well as between them.\n\n",
+    sep='')
 
-    ##keyRaw <- unique(rawData[, c('SubjectID', 'Day', 'Strain', 'Protein')])
-    keyRaw <- paste(rawData$SubjectID, rawData$Day, rawData$Strain, rawData$Protein, sep='@')
-    cat("Rows x Columns of MFI data:\n")
-    print(dim(rawData))
-    #print(length(keyRaw))
-
-    keyConc <- paste(concData$SubjectID, concData$Day, concData$Strain, concData$Protein, sep='@')
-    cat("Rows x Columns of Concentration data:\n")
-    print(dim(concData))
-    #print(length(keyConc))
+## Create a KEY which uniquely defines each row (=record) of data
+cat("\nMFI dataset: Rows x Columns: ", nrow(rawData), " x ", ncol(rawData), "\n", sep='')
+cat("\nChecking for duplicated 'MFI' Sample Names:\n")
+keyRaw <- paste(rawData$SubjectID, rawData$Day, rawData$Assay, rawData$Strain, sep='@')
+inx <- duplicated(keyRaw)
+if(sum(inx) > 0) {
+    dups <- sort(unique(keyRaw[inx]))
+    ind <- keyRaw %in% dups
+    cat("Duplicated raw KEYs:\n\t", wrapText(paste(keyRaw[ind], which(ind), sep=' - ')), "\n")
+} else {
+    cat("\tNone found.\n\n")
 }
+
+cat("\nConcentration dataset: Rows x Columns: ", nrow(concData), " x ", ncol(concData), "\n", sep='')
+cat("\nChecking for duplicated 'Concentration' Sample Names:\n")
+keyConc <- paste(concData$SubjectID, concData$Day, concData$Assay, concData$Strain, sep='@')
+inx <- duplicated(keyConc)
+if(sum(inx) > 0) {
+    dups <- sort(unique(keyConc[inx]))
+    ind <- keyConc %in% dups
+    cat("Duplicated Conc KEYs:\n\t", wrapText(paste(keyConc[ind], which(ind), sep=' - ')), "\n")
+} else {
+    cat("\tNone found.\n\n")
+}
+
+## Perform set differences both ways
+d1 <- setdiff(keyRaw, keyConc)
+d2 <- setdiff(keyConc, keyRaw)
+if(length(d1) == 0 & length(d2) == 0) {
+    cat("No differences found between the 'MFI' and 'Concentration' dataset SampleIDs.\n")
+} else {
+    cat("\nChecking for differences in raw vs conc keys - expecting largely complete overlap.\n")
+    if(length(d1) > 0) {
+        cat("\nSeveral raw KEYs present while conc Keys missing:\n\t", wrapText(d1), "\n\n", sep='')
+    }
+    if(length(d2) > 0) {
+        cat("\nSeveral conc KEYs present while raw Keys missing:\n\t", wrapText(d2), "\n\n", sep='')
+    }
+}
+##--------------------------------------------------------------------------------
+## Tabulate the contents of rawData and concData
+cat(dhLine, "\n", "Confirming expected values in output tables:\n", sep='')
+
+cat("\nRaw Data ('Net MFI'):\n\n")
+print(sapply(rawData[, -10], function(x) return(table(x, useNA='ifany'))))
+
+cat(shLine, "\nConcentration Data:\n\n")
+print(sapply(concData[, -10], function(x) return(table(x, useNA='ifany'))))
 
 ##--------------------------------------------------------------------------------
 ## Output the data to a CSV file
@@ -577,6 +510,7 @@ cat("Writing combined dataset to file:", outName, "\n\n")
 write.csv(tmp, outName, row.names=FALSE)
 
 ##********************************************************************************
+
 ## Completed.
 EndTime <- Sys.time()
 cat(dhLine, "\nCompleted: ", format(EndTime, '%Y-%m-%d %H:%M:%S'), ".\n",

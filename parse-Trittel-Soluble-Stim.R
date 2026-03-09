@@ -435,7 +435,7 @@ concData <- parseSampleSheet(File=inFile, Sheet="Concentration")
 stopifnot(concData$SampleType %in% SampleTypes,
           concData$Trial %in% TrialNames,
           concData$Day %in% VisitDay,
-          #concData$Assay %in% AssayNames,
+          concData$Assay %in% AssayNames,
           concData$Strain %in% KnownStrains,
           colnames(concData) %in% ColumnNames
           )

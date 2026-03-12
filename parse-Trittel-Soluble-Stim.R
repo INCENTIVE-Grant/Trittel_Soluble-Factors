@@ -11,7 +11,7 @@
 ##
 ## VERSION HISTORY
 ## [2025-06-15 MeD] Initial version.
-## [2026-03-03 MeD] Updated dataset: Guzmán-Riese-Tritel_Soluble-Factors_2026-03-03.xlsx
+## [2026-03-03 MeD] Updated dataset: Guzmán-Riese-Trittel_Soluble-Factors_2026-03-03.xlsx
 ##                  Looks more consistent than before. Bridging samples removed.
 ##
 ##********************************************************************************
@@ -32,7 +32,7 @@ source('Controlled-Vocab.R')
 
 ## GLOBAL variables
 ProgramName <- 'parse-Trittel-Soluble-Stim.R'
-Version <- 'v2.0.1'
+Version <- 'v2.0.2'
 
 options(warn=1, width=132)
 
@@ -104,7 +104,7 @@ stopifnot(Stims$Trial %in% TrialNames,
 
 ## Assign my input file name; if I don't, then get the command-line argument
 if(interactive())
-    inFile <- "Guzmán-Riese-Tritel_Soluble-Factors_2026-03-03.xlsx"
+    inFile <- "Guzmán-Riese-Trittel_Soluble-Factors_2026-03-03.xlsx"
 
 ## Check if an 'inFile' object already exists. Useful in debugging, etc.
 if( !exists('inFile') ) {

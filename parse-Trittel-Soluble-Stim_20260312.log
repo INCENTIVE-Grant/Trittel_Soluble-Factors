@@ -1,11 +1,11 @@
 ----------------------------------------------------------------------------------------------------------------------------------
 Program: parse-Trittel-Soluble-Stim.R
-Version: v2.0.1, Git Tag: v2.0.1
-Run Date: 2026-03-09 17:58:30 EDT
+Version: v2.0.1, Git Tag: v2.0.1-4-gcd231b2
+Run Date: 2026-03-12 12:21:48 EDT
 User: hvp
 Hostname: xena
 Working Dir: /home/hvp/Documents/Projects/2026-03-03_HZI-Lumminex_Stephanie-Trittel_v2
-Arguments: Guzmán-Riese-Tritel_Soluble-Factors_2026-03-03.xlsx
+Arguments: Guzmán-Riese-Trittel_Soluble-Factors_2026-03-03.xlsx
 ----------------------------------------------------------------------------------------------------------------------------------
 R version 4.5.0 (2025-04-11)
 Platform: x86_64-pc-linux-gnu
@@ -36,9 +36,9 @@ loaded via a namespace (and not attached):
 Vocabulary Version: v1.6 
 
 Data input & output files:
-	Inp = Guzmán-Riese-Tritel_Soluble-Factors_2026-03-03.xlsx
-	Out = Guzmán-Riese-Tritel_Soluble-Factors_2026-03-03_20260309.csv
-	Log = parse-Trittel-Soluble-Stim_20260309.log
+	Inp = Guzmán-Riese-Trittel_Soluble-Factors_2026-03-03.xlsx
+	Out = Guzmán-Riese-Trittel_Soluble-Factors_2026-03-03_20260312.csv
+	Log = parse-Trittel-Soluble-Stim_20260312.log
 
 
 ==================================================================================================================================
@@ -1227,8 +1227,8 @@ Combined dataset of MFI and Concentration created.
 	Dataset is 120,120 rows x 11 columns.
 	It is 13,380,704 bytes in RAM.
 
-Writing combined dataset to file: Guzmán-Riese-Tritel_Soluble-Factors_2026-03-03_20260309.csv 
+Writing combined dataset to file: Guzmán-Riese-Trittel_Soluble-Factors_2026-03-03_20260312.csv 
 
 ==================================================================================================================================
-Completed: 2026-03-09 17:58:32.
-Run-time: 1.712984 secs.
+Completed: 2026-03-12 12:21:50.
+Run-time: 1.75107 secs.
